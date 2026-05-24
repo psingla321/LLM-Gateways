@@ -1,0 +1,1367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚡ LLM Gateway — Insurance Claims</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    /* ── Reset & Variables ───────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d1117;
+      --bg-2:        #161b22;
+      --bg-3:        #1c2128;
+      --border:      #30363d;
+      --border-glow: #58a6ff44;
+      --txt:         #e6edf3;
+      --txt-2:       #8b949e;
+      --txt-3:       #484f58;
+      --blue:        #58a6ff;
+      --blue-dim:    #1f6feb;
+      --green:       #3fb950;
+      --yellow:      #d29922;
+      --red:         #f85149;
+      --purple:      #bc8cff;
+      --cyan:        #39d353;
+      --r:           10px;
+      --r-sm:        6px;
+      --shadow:      0 4px 24px #0006;
+    }
+
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: var(--bg); color: var(--txt); min-height: 100vh; }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      display: flex; align-items: center; gap: 16px;
+      padding: 0 28px; height: 56px;
+      background: var(--bg-2); border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+    }
+    .logo { font-size: 1.15rem; font-weight: 700; color: var(--txt); display: flex; align-items: center; gap: 8px; }
+    .logo span { color: var(--blue); }
+    .header-badges { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+    .badge {
+      font-size: 0.68rem; font-weight: 700; letter-spacing: .06em;
+      padding: 3px 10px; border-radius: 20px; text-transform: uppercase;
+    }
+    .badge-mock   { background: #2d1f00; color: var(--yellow); border: 1px solid var(--yellow)44; }
+    .badge-live   { background: #0d2a0d; color: var(--green);  border: 1px solid var(--green)44; }
+    .badge-blue   { background: #0c2042; color: var(--blue);   border: 1px solid var(--blue)44; }
+    .header-stat  { font-size: 0.78rem; color: var(--txt-2); }
+    .header-stat b { color: var(--txt); }
+
+    /* ── Layout ─────────────────────────────────────────────────────────── */
+    .page { max-width: 1400px; margin: 0 auto; padding: 24px 24px 48px; }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 20px; margin-bottom: 24px;
+    }
+
+    /* ── Card ────────────────────────────────────────────────────────────── */
+    .card {
+      background: var(--bg-2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 20px;
+      box-shadow: var(--shadow);
+    }
+    .card-title {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--txt-2); margin-bottom: 16px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-title::before { content: ''; display: inline-block; width: 3px; height: 14px;
+                          background: var(--blue); border-radius: 2px; }
+
+    /* ── Form ────────────────────────────────────────────────────────────── */
+    label { font-size: 0.78rem; color: var(--txt-2); font-weight: 600; display: block; margin-bottom: 5px; }
+    .field { margin-bottom: 14px; }
+
+    select, input[type="text"] {
+      width: 100%; background: var(--bg-3); border: 1px solid var(--border);
+      border-radius: var(--r-sm); color: var(--txt); padding: 8px 12px;
+      font-size: 0.85rem; outline: none; transition: border-color .2s;
+    }
+    select:focus, input[type="text"]:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--border-glow); }
+
+    textarea {
+      width: 100%; background: var(--bg-3); border: 1px solid var(--border);
+      border-radius: var(--r-sm); color: var(--txt); padding: 10px 12px;
+      font-size: 0.82rem; font-family: 'SF Mono', 'Consolas', monospace;
+      line-height: 1.55; resize: vertical; min-height: 180px; outline: none;
+      transition: border-color .2s;
+    }
+    textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--border-glow); }
+
+    /* Priority radios */
+    .radio-row { display: flex; gap: 10px; }
+    .radio-btn { flex: 1; }
+    .radio-btn input { display: none; }
+    .radio-btn label {
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 7px 0; border-radius: var(--r-sm); border: 1px solid var(--border);
+      cursor: pointer; font-size: 0.8rem; font-weight: 600; transition: all .2s;
+      background: var(--bg-3); color: var(--txt-2); margin: 0;
+    }
+    .radio-btn input:checked + label { border-color: var(--blue); color: var(--blue); background: #0c2042; }
+
+    /* Toggle */
+    .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .toggle { position: relative; width: 40px; height: 22px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0; cursor: pointer;
+      background: var(--bg-3); border: 1px solid var(--border);
+      border-radius: 22px; transition: .25s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; left: 3px; top: 3px;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--txt-3); transition: .25s;
+    }
+    .toggle input:checked + .toggle-slider { background: var(--red)33; border-color: var(--red); }
+    .toggle input:checked + .toggle-slider::before { transform: translateX(18px); background: var(--red); }
+    .toggle-label { font-size: 0.8rem; color: var(--txt-2); font-weight: 600; }
+
+    /* Sample buttons */
+    .sample-btns { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+    .sample-btn {
+      font-size: 0.73rem; font-weight: 600; padding: 5px 10px;
+      border-radius: var(--r-sm); border: 1px solid var(--border);
+      background: var(--bg-3); color: var(--txt-2); cursor: pointer;
+      transition: all .2s;
+    }
+    .sample-btn:hover { border-color: var(--blue); color: var(--blue); background: #0c2042; }
+
+    /* Form actions */
+    .action-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    /* Submit button */
+    .submit-btn {
+      width: 100%; padding: 11px; border-radius: var(--r-sm);
+      border: none; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+      background: linear-gradient(135deg, var(--blue-dim), var(--blue));
+      color: #fff; transition: all .2s; display: flex; align-items: center;
+      justify-content: center; gap: 8px;
+    }
+    .submit-btn:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); box-shadow: 0 4px 20px #58a6ff33; }
+    .submit-btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    .clear-btn {
+      padding: 11px 14px;
+      border-radius: var(--r-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-3);
+      color: var(--txt-2);
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    .clear-btn:hover {
+      border-color: var(--yellow);
+      color: var(--yellow);
+      background: #2a1e00;
+    }
+
+    /* ── Pipeline ────────────────────────────────────────────────────────── */
+    .pipeline { display: flex; flex-direction: column; gap: 8px; }
+
+    .step {
+      display: grid; grid-template-columns: 40px 1fr auto;
+      align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: var(--r-sm);
+      border: 1px solid var(--border); background: var(--bg-3);
+      transition: all .35s ease;
+    }
+    .step.active  { border-color: var(--blue); background: #0c2042; box-shadow: 0 0 0 3px var(--border-glow); }
+    .step.done    { border-color: var(--border); background: var(--bg-3); }
+    .step.success { border-color: var(--green)55; }
+    .step.warn    { border-color: var(--yellow)55; }
+    .step.error   { border-color: var(--red)55; }
+
+    .step-icon {
+      width: 36px; height: 36px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; background: var(--bg-2); border: 1px solid var(--border);
+      transition: all .3s;
+    }
+    .step.active  .step-icon { background: #1a3558; border-color: var(--blue); }
+    .step.success .step-icon { background: #0d2a0d; border-color: var(--green)55; }
+    .step.warn    .step-icon { background: #2a1e00; border-color: var(--yellow)55; }
+
+    .step-body { min-width: 0; }
+    .step-name { font-size: 0.82rem; font-weight: 700; color: var(--txt); margin-bottom: 2px; }
+    .step-detail {
+      font-size: 0.73rem; color: var(--txt-2); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .step-detail.mono { font-family: 'SF Mono', Consolas, monospace; }
+
+    .step-status { text-align: right; }
+    .step-badge {
+      font-size: 0.65rem; font-weight: 800; letter-spacing: .06em;
+      padding: 2px 8px; border-radius: 20px; text-transform: uppercase; white-space: nowrap;
+    }
+    .sb-pending  { background: var(--bg-2);       color: var(--txt-3); border: 1px solid var(--border); }
+    .sb-spin     { background: #0c2042;            color: var(--blue);  border: 1px solid var(--blue)44; }
+    .sb-success  { background: #0d2a0d;            color: var(--green); border: 1px solid var(--green)44; }
+    .sb-warn     { background: #2a1e00;            color: var(--yellow);border: 1px solid var(--yellow)44; }
+    .sb-info     { background: #0c2042;            color: var(--blue);  border: 1px solid var(--blue)44; }
+    .sb-hit      { background: #0d2a0d;            color: var(--green); border: 1px solid var(--green)44; }
+    .sb-miss     { background: #1c2128;            color: var(--txt-2); border: 1px solid var(--border); }
+    .sb-red      { background: #2a0d0d;            color: var(--red);   border: 1px solid var(--red)44; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { display: inline-block; width: 12px; height: 12px;
+               border: 2px solid var(--blue)44; border-top-color: var(--blue);
+               border-radius: 50%; animation: spin .7s linear infinite; }
+
+    /* PII tag */
+    .pii-tag {
+      display: inline-block; font-size: 0.65rem; font-weight: 700;
+      padding: 1px 6px; border-radius: 4px; margin-right: 4px;
+      background: #2a0d3a; color: var(--purple); border: 1px solid var(--purple)44;
+    }
+
+    /* ── Summary Card ────────────────────────────────────────────────────── */
+    .summary-card {
+      margin-top: 16px; padding: 16px 18px;
+      background: var(--bg-3); border: 1px solid var(--green)44;
+      border-radius: var(--r); display: none;
+    }
+    .summary-card.visible { display: block; animation: fadeSlide .4s ease; }
+    .summary-title { font-size: 0.7rem; font-weight: 700; letter-spacing: .08em;
+                     text-transform: uppercase; color: var(--green); margin-bottom: 10px; }
+    .summary-text { font-size: 0.83rem; line-height: 1.65; color: var(--txt); white-space: pre-wrap; }
+
+    /* Masked input preview */
+    .masked-preview {
+      margin-top: 12px; padding: 10px 12px;
+      background: #2a0d0d22; border: 1px solid var(--red)33;
+      border-radius: var(--r-sm); display: none;
+    }
+    .masked-preview.visible { display: block; }
+    .masked-label { font-size: 0.68rem; font-weight: 700; color: var(--red); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .06em; }
+    .masked-text  { font-size: 0.75rem; font-family: 'SF Mono', Consolas, monospace;
+                    color: var(--txt-2); line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+
+    /* ── Metrics Bar ─────────────────────────────────────────────────────── */
+    .metrics-bar {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 8px; margin-top: 14px; display: none;
+    }
+    .metrics-bar.visible { display: grid; animation: fadeSlide .4s ease; }
+    .metric-pill {
+      padding: 10px 12px; background: var(--bg-3);
+      border: 1px solid var(--border); border-radius: var(--r-sm);
+      text-align: center;
+    }
+    .metric-value { font-size: 0.9rem; font-weight: 800; color: var(--txt); }
+    .metric-value.green  { color: var(--green); }
+    .metric-value.yellow { color: var(--yellow); }
+    .metric-value.red    { color: var(--red); }
+    .metric-value.blue   { color: var(--blue); }
+    .metric-label { font-size: 0.62rem; color: var(--txt-3); text-transform: uppercase;
+                    letter-spacing: .06em; margin-top: 2px; }
+
+    /* Extra metrics (second row) */
+    .metrics-bar-2 {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      gap: 8px; margin-top: 8px; display: none;
+    }
+    .metrics-bar-2.visible { display: grid; animation: fadeSlide .5s ease; }
+
+    /* ── Dashboard ───────────────────────────────────────────────────────── */
+    .section-title {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: .09em;
+      text-transform: uppercase; color: var(--txt-2); margin: 28px 0 14px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .section-title.actions::after { margin-left: 10px; }
+
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      color: var(--txt-2);
+      cursor: pointer;
+      transition: all .2s;
+      flex-shrink: 0;
+    }
+    .icon-btn:hover {
+      border-color: var(--red);
+      color: var(--red);
+      background: #2a0d0d;
+    }
+    .icon-btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    /* KPI cards */
+    .kpi-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 20px; }
+    .kpi {
+      background: var(--bg-2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 16px; text-align: center;
+    }
+    .kpi-value { font-size: 1.4rem; font-weight: 800; color: var(--txt); }
+    .kpi-label { font-size: 0.65rem; color: var(--txt-2); text-transform: uppercase;
+                 letter-spacing: .07em; margin-top: 4px; }
+
+    /* Chart grid */
+    .chart-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .chart-card {
+      background: var(--bg-2); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 20px;
+    }
+    .chart-label { font-size: 0.72rem; font-weight: 700; letter-spacing: .07em;
+                   text-transform: uppercase; color: var(--txt-2); margin-bottom: 16px; }
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* ── Table ───────────────────────────────────────────────────────────── */
+    .table-wrap {
+      background: var(--bg-2); border: 1px solid var(--border);
+      border-radius: var(--r); overflow: hidden;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    thead tr { background: var(--bg-3); }
+    th {
+      padding: 10px 14px; text-align: left; font-size: 0.65rem;
+      font-weight: 700; letter-spacing: .07em; color: var(--txt-2);
+      text-transform: uppercase; border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 9px 14px; border-bottom: 1px solid var(--border);
+      color: var(--txt); white-space: nowrap;
+    }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: var(--bg-3); }
+    .td-mono { font-family: 'SF Mono', Consolas, monospace; font-size: 0.72rem; color: var(--txt-2); }
+    .td-id   { font-family: 'SF Mono', Consolas, monospace; font-weight: 700; color: var(--blue); }
+
+    /* Inline badges */
+    .ib { display: inline-block; font-size: 0.63rem; font-weight: 800;
+          padding: 1px 7px; border-radius: 12px; text-transform: uppercase; letter-spacing: .05em; }
+    .ib-complex  { background: #2a0d0d; color: var(--red);    border: 1px solid var(--red)33; }
+    .ib-simple   { background: #0d2a0d; color: var(--green);  border: 1px solid var(--green)33; }
+    .ib-hit      { background: #0d2a0d; color: var(--green);  border: 1px solid var(--green)33; }
+    .ib-miss     { background: var(--bg-3); color: var(--txt-2); border: 1px solid var(--border); }
+    .ib-yes      { background: #2a0d0d; color: var(--red);    border: 1px solid var(--red)33; }
+    .ib-no       { background: var(--bg-3); color: var(--txt-3); border: 1px solid var(--border); }
+    .ib-pii      { background: #2a0d3a; color: var(--purple); border: 1px solid var(--purple)33; }
+    .ib-model    { background: #0c2042; color: var(--blue);   border: 1px solid var(--blue)33; }
+
+    /* ── Animations ──────────────────────────────────────────────────────── */
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .5; } }
+
+    /* ── Explainability Panel ────────────────────────────────────────────── */
+    .xp-card {
+      margin-top: 20px; background: var(--bg-2);
+      border: 1px solid var(--border); border-radius: var(--r);
+      overflow: hidden; display: none;
+    }
+    .xp-card.visible { display: block; animation: fadeSlide .45s ease; }
+
+    .xp-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 18px; background: var(--bg-3);
+      border-bottom: 1px solid var(--border); cursor: pointer;
+      user-select: none;
+    }
+    .xp-header-left { display: flex; align-items: center; gap: 8px; }
+    .xp-header-title {
+      font-size: 0.72rem; font-weight: 800; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--blue);
+    }
+    .xp-chevron { color: var(--txt-2); font-size: 0.8rem; transition: transform .25s; }
+    .xp-chevron.open { transform: rotate(90deg); }
+    .xp-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 16px; }
+
+    /* Section within explainability */
+    .xp-section { border: 1px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+    .xp-section-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 14px; background: var(--bg-3);
+      border-bottom: 1px solid var(--border);
+    }
+    .xp-section-icon  { font-size: 1rem; }
+    .xp-section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
+                        letter-spacing: .07em; color: var(--txt-2); }
+    .xp-section-badge { margin-left: auto; }
+    .xp-section-body  { padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+
+    /* Key–value rows */
+    .xp-row { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+    .xp-key   { font-size: 0.7rem; font-weight: 700; color: var(--txt-2);
+                min-width: 130px; flex-shrink: 0; }
+    .xp-val   { font-size: 0.76rem; color: var(--txt); }
+    .xp-val.mono { font-family: 'SF Mono', Consolas, monospace; font-size: 0.72rem; color: var(--txt-2); }
+    .xp-val.hl   { color: var(--blue); font-weight: 700; }
+    .xp-val.green { color: var(--green); font-weight: 700; }
+    .xp-val.yellow{ color: var(--yellow); font-weight: 700; }
+    .xp-val.red   { color: var(--red); font-weight: 700; }
+
+    /* Confidence bar */
+    .conf-row { display: flex; align-items: center; gap: 10px; }
+    .conf-bar-bg {
+      flex: 1; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;
+    }
+    .conf-bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+    .conf-pct { font-size: 0.75rem; font-weight: 800; min-width: 36px; text-align: right; }
+
+    /* Signal tags */
+    .signal-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 2px; }
+    .sig-tag {
+      font-size: 0.65rem; font-weight: 700; padding: 2px 8px;
+      border-radius: 12px;
+    }
+    .sig-complex { background: #2a0d0d; color: var(--red);    border: 1px solid var(--red)44; }
+    .sig-simple  { background: #0d2a0d; color: var(--green);  border: 1px solid var(--green)44; }
+    .sig-none    { background: var(--bg-3); color: var(--txt-3); border: 1px solid var(--border); font-style: italic; }
+
+    /* Cost comparison table inside XP */
+    .cost-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; margin-top: 6px; }
+    .cost-table th {
+      padding: 6px 10px; background: var(--bg); text-align: left;
+      font-size: 0.62rem; font-weight: 700; letter-spacing: .07em;
+      text-transform: uppercase; color: var(--txt-3);
+      border-bottom: 1px solid var(--border);
+    }
+    .cost-table td { padding: 7px 10px; border-bottom: 1px solid var(--border)44; }
+    .cost-table tr:last-child td { border-bottom: none; }
+    .cost-table tr.selected-row { background: #0c2042; }
+    .cost-table tr.selected-row td { color: var(--blue); }
+    .selected-marker { font-size: 0.7rem; font-weight: 800; color: var(--green); }
+    .tier-pill {
+      display: inline-block; font-size: 0.6rem; font-weight: 700; padding: 1px 6px;
+      border-radius: 10px; text-transform: uppercase;
+    }
+    .tier-premium  { background: #2a0d3a; color: var(--purple); border: 1px solid var(--purple)33; }
+    .tier-economy  { background: #0d2a0d; color: var(--green);  border: 1px solid var(--green)33; }
+    .tier-fallback { background: #2a1e00; color: var(--yellow); border: 1px solid var(--yellow)33; }
+
+    /* Plain-English callout */
+    .xp-callout {
+      padding: 10px 14px; border-radius: var(--r-sm);
+      border-left: 3px solid var(--blue); background: #0c204233;
+      font-size: 0.78rem; color: var(--txt-2); line-height: 1.6;
+    }
+    .xp-callout.green  { border-color: var(--green);  background: #0d2a0d33; }
+    .xp-callout.yellow { border-color: var(--yellow); background: #2a1e0033; }
+    .xp-callout.red    { border-color: var(--red);    background: #2a0d0d33; }
+    @media (max-width: 1100px) {
+      .main-grid   { grid-template-columns: 1fr; }
+      .kpi-grid    { grid-template-columns: repeat(3, 1fr); }
+      .chart-grid  { grid-template-columns: 1fr 1fr; }
+      .metrics-bar, .metrics-bar-2 { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 700px) {
+      .kpi-grid    { grid-template-columns: repeat(2, 1fr); }
+      .chart-grid  { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">⚡ <span>LLM</span> Gateway</div>
+  <span class="badge badge-blue">Insurance Claims Demo</span>
+  <div class="header-badges" id="headerBadges">
+    <span class="badge badge-mock" id="modeBadge">MOCK MODE</span>
+    <span class="header-stat">Requests: <b id="hdrRequests">—</b></span>
+    <span class="header-stat">Cost: <b id="hdrCost">$—</b></span>
+    <span class="header-stat">Cache: <b id="hdrCache">—</b></span>
+  </div>
+</header>
+
+<div class="page">
+
+  <!-- ── Main grid ─────────────────────────────────────────────────────────── -->
+  <div class="main-grid">
+
+    <!-- LEFT: Claim Submission Form -->
+    <div class="card">
+      <div class="card-title">Submit Claim</div>
+
+      <div class="field">
+        <label>Team</label>
+        <select id="team">
+          <option value="claims-auto">🚗  Claims — Auto</option>
+          <option value="claims-health">🏥  Claims — Health</option>
+          <option value="fraud-detection">🔍  Fraud Detection</option>
+          <option value="underwriting">📋  Underwriting</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>User / Adjuster ID</label>
+        <input type="text" id="userId" value="adjuster_001" />
+      </div>
+
+      <div class="field">
+        <label>Priority</label>
+        <div class="radio-row">
+          <div class="radio-btn">
+            <input type="radio" name="priority" id="pNormal" value="normal" checked />
+            <label for="pNormal">📋 Normal</label>
+          </div>
+          <div class="radio-btn">
+            <input type="radio" name="priority" id="pHigh" value="high" />
+            <label for="pHigh">🔴 Urgent</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <label class="toggle">
+          <input type="checkbox" id="forceFallback" />
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">⚠ Simulate Primary Model Failure (demo fallback)</span>
+      </div>
+
+      <div class="field">
+        <label>Claim Text</label>
+        <div class="sample-btns">
+          <button class="sample-btn" onclick="loadSample('simple')">🚗 Simple Auto</button>
+          <button class="sample-btn" onclick="loadSample('complex')">🏥 Complex + PII</button>
+          <button class="sample-btn" onclick="loadSample('fraud')">🔍 Fraud Flag</button>
+        </div>
+        <textarea id="claimText" placeholder="Paste or type claim text here…"></textarea>
+      </div>
+
+      <div class="action-row">
+        <button class="submit-btn" id="submitBtn" onclick="submitClaim()" type="button">
+          <span id="submitLabel">Process Claim</span>
+        </button>
+        <button class="clear-btn" id="clearBtn" onclick="clearOldRequest()" type="button">
+          Clear Old Request
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Gateway Pipeline Visualization -->
+    <div>
+      <div class="card">
+        <div class="card-title">Gateway Pipeline</div>
+
+        <div class="pipeline" id="pipeline">
+          <!-- Steps injected by JS -->
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-card" id="summaryCard">
+          <div class="summary-title">✦ Claim Summary</div>
+          <div class="summary-text" id="summaryText"></div>
+        </div>
+
+        <!-- Masked preview -->
+        <div class="masked-preview" id="maskedPreview">
+          <div class="masked-label">🔒 What the LLM received (PII stripped)</div>
+          <div class="masked-text" id="maskedText"></div>
+        </div>
+
+        <!-- Metrics row 1 -->
+        <div class="metrics-bar" id="metricsBar1">
+          <div class="metric-pill">
+            <div class="metric-value blue" id="mModel">—</div>
+            <div class="metric-label">Model Used</div>
+          </div>
+          <div class="metric-pill">
+            <div class="metric-value" id="mProvider">—</div>
+            <div class="metric-label">Provider</div>
+          </div>
+          <div class="metric-pill">
+            <div class="metric-value" id="mTokens">—</div>
+            <div class="metric-label">Tokens In / Out</div>
+          </div>
+          <div class="metric-pill">
+            <div class="metric-value green" id="mCost">—</div>
+            <div class="metric-label">Cost USD</div>
+          </div>
+        </div>
+
+        <!-- Metrics row 2 -->
+        <div class="metrics-bar-2" id="metricsBar2">
+          <div class="metric-pill">
+            <div class="metric-value" id="mLatency">—</div>
+            <div class="metric-label">Latency</div>
+          </div>
+          <div class="metric-pill">
+            <div class="metric-value" id="mCache">—</div>
+            <div class="metric-label">Cache</div>
+          </div>
+          <div class="metric-pill">
+            <div class="metric-value" id="mFallback">—</div>
+            <div class="metric-label">Fallback</div>
+          </div>
+          <div class="metric-pill">
+            <div class="metric-value" id="mPii">—</div>
+            <div class="metric-label">PII Masked</div>
+          </div>
+        </div>
+
+        <!-- ── Explainability Panel ─────────────────────────────────────── -->
+        <div class="xp-card" id="xpCard">
+          <div class="xp-header" onclick="toggleXP()">
+            <div class="xp-header-left">
+              <span>💡</span>
+              <span class="xp-header-title">Explainability — Why this model was selected</span>
+            </div>
+            <span class="xp-chevron" id="xpChevron">▶</span>
+          </div>
+          <div class="xp-body" id="xpBody"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Dashboard ─────────────────────────────────────────────────────────── -->
+  <div class="section-title">Live Dashboard</div>
+
+  <!-- KPI cards -->
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-value" id="kRequests">—</div><div class="kpi-label">Total Requests</div></div>
+    <div class="kpi"><div class="kpi-value" id="kCost">—</div><div class="kpi-label">Total Cost</div></div>
+    <div class="kpi"><div class="kpi-value" id="kLatency">—</div><div class="kpi-label">Avg Latency</div></div>
+    <div class="kpi"><div class="kpi-value" id="kCache">—</div><div class="kpi-label">Cache Hit Rate</div></div>
+    <div class="kpi"><div class="kpi-value" id="kPii">—</div><div class="kpi-label">PII Masked</div></div>
+    <div class="kpi"><div class="kpi-value" id="kFallbacks">—</div><div class="kpi-label">Fallbacks</div></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-label">💰 Budget by Team (USD)</div>
+      <div class="chart-wrap"><canvas id="chartTeams"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">🤖 Model Usage</div>
+      <div class="chart-wrap"><canvas id="chartModels"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-label">⚡ Cache Performance</div>
+      <div class="chart-wrap"><canvas id="chartCache"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Recent requests table -->
+  <div class="section-title actions">
+    Recent Requests
+    <button class="icon-btn" id="clearRecentBtn" onclick="clearRecentRequests()" type="button" title="Clear Recent Requests" aria-label="Clear Recent Requests">
+      🗑
+    </button>
+  </div>
+  <div class="table-wrap">
+    <table id="recentTable">
+      <thead>
+        <tr>
+          <th>ID</th><th>Time</th><th>Team</th><th>User</th>
+          <th>Task</th><th>Model</th><th>Provider</th>
+          <th>Tokens</th><th>Cost</th><th>Latency</th>
+          <th>Cache</th><th>Fallback</th><th>PII</th>
+        </tr>
+      </thead>
+      <tbody id="recentBody">
+        <tr><td colspan="13" style="text-align:center;color:var(--txt-3);padding:32px">
+          Submit a claim to see requests here.
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ── Sample claims ─────────────────────────────────────────────────────────────
+const SAMPLES = {
+  simple: `Claim #AUTO-2024-0512
+Vehicle rear-ended at a red light on May 5, 2024. Minor bumper and trunk panel damage.
+No injuries reported by either driver. Requesting approval for repair estimate of $780.`,
+
+  complex: `Claim #HEALTH-2024-0891
+Patient: Sarah Johnson | DOB: 07/22/1985 | SSN: 547-82-3901
+Contact: sarah.johnson@gmail.com | Phone: 312-555-8847
+
+Multi-vehicle collision on I-294 northbound on April 12, 2024.
+Claimant sustained cervical fracture (C4-C5) requiring surgical intervention
+(anterior cervical discectomy and fusion — ACDF). Total hospitalisation: 11 days.
+
+Third-party liability is disputed. Attorney representation confirmed (Chen & Park LLC).
+Pre-existing degenerative disc condition documented.
+Total medical invoices: $128,450. Lost wages claim: $24,000.
+Subrogation against at-fault driver's insurer (Policy #TXL-882-09-Z) initiated.`,
+
+  fraud: `Claim #FRAUD-2024-0103
+Claimant IP: 192.168.45.12. This is the third claim filed this quarter.
+Damage report inconsistent with collision photos submitted.
+Two witness statements contradict the timeline in the claim form.
+Requesting full investigation before any payout is authorised.`,
+};
+
+// ── Pipeline step definitions ─────────────────────────────────────────────────
+const STEPS = [
+  { id: 'pii',      icon: '🔒', label: 'PII Masking',         hint: 'Scanning for sensitive data' },
+  { id: 'classify', icon: '🔍', label: 'Task Classification', hint: 'Estimating complexity & token count' },
+  { id: 'cache',    icon: '⚡', label: 'Cache Lookup',        hint: 'Checking response cache' },
+  { id: 'route',    icon: '🗺️', label: 'Model Routing',       hint: 'Selecting optimal model' },
+  { id: 'llm',      icon: '🤖', label: 'LLM Response',        hint: 'Generating claim summary' },
+];
+
+// ── Chart instances ───────────────────────────────────────────────────────────
+let charts = {};
+
+// ── Build pipeline HTML ───────────────────────────────────────────────────────
+function buildPipeline() {
+  const el = document.getElementById('pipeline');
+  el.innerHTML = STEPS.map((s, i) => `
+    <div class="step" id="step-${s.id}">
+      <div class="step-icon" id="icon-${s.id}">${s.icon}</div>
+      <div class="step-body">
+        <div class="step-name">${s.label}</div>
+        <div class="step-detail" id="detail-${s.id}">${s.hint}</div>
+      </div>
+      <div class="step-status">
+        <span class="step-badge sb-pending" id="badge-${s.id}">—</span>
+      </div>
+    </div>`).join('');
+}
+
+function resetPipeline() {
+  STEPS.forEach(s => {
+    document.getElementById(`step-${s.id}`).className = 'step';
+    document.getElementById(`badge-${s.id}`).className = 'step-badge sb-pending';
+    document.getElementById(`badge-${s.id}`).innerHTML = '—';
+    document.getElementById(`detail-${s.id}`).innerHTML = s.hint;
+  });
+  document.getElementById('summaryCard').classList.remove('visible');
+  document.getElementById('maskedPreview').classList.remove('visible');
+  document.getElementById('metricsBar1').classList.remove('visible');
+  document.getElementById('metricsBar2').classList.remove('visible');
+  const xpCard = document.getElementById('xpCard');
+  xpCard.classList.remove('visible');
+  document.getElementById('xpBody').innerHTML = '';
+}
+
+function clearOldRequest() {
+  document.getElementById('claimText').value = '';
+  document.getElementById('forceFallback').checked = false;
+  document.getElementById('submitBtn').disabled = false;
+  document.getElementById('submitLabel').textContent = 'Process Claim';
+  resetPipeline();
+  document.getElementById('claimText').focus();
+}
+
+function setStepActive(id) {
+  const stepEl  = document.getElementById(`step-${id}`);
+  const badgeEl = document.getElementById(`badge-${id}`);
+  stepEl.className = 'step active';
+  badgeEl.className = 'step-badge sb-spin';
+  badgeEl.innerHTML = '<span class="spinner"></span>';
+}
+
+function setStepResult(id, badgeClass, badgeText, detailHtml, stepClass) {
+  document.getElementById(`step-${id}`).className  = `step done ${stepClass}`;
+  const b = document.getElementById(`badge-${id}`);
+  b.className   = `step-badge ${badgeClass}`;
+  b.textContent = badgeText;
+  const d = document.getElementById(`detail-${id}`);
+  d.innerHTML   = detailHtml;
+  d.className   = 'step-detail';
+}
+
+// ── Submit handler ────────────────────────────────────────────────────────────
+async function submitClaim() {
+  const claimText = document.getElementById('claimText').value.trim();
+  if (!claimText) { alert('Please enter claim text.'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  document.getElementById('submitLabel').innerHTML = '<span class="spinner"></span>&nbsp;Processing…';
+
+  resetPipeline();
+  // Immediately show step 1 as active
+  setStepActive('pii');
+
+  const payload = {
+    claim_text:     claimText,
+    team:           document.getElementById('team').value,
+    user_id:        document.getElementById('userId').value || 'demo_user',
+    priority:       document.querySelector('input[name="priority"]:checked').value,
+    force_fallback: document.getElementById('forceFallback').checked,
+  };
+
+  let result;
+  try {
+    const res = await fetch('/api/claim', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) { const err = await res.json(); throw new Error(err.detail || res.statusText); }
+    result = await res.json();
+  } catch (e) {
+    alert('Error: ' + e.message);
+    btn.disabled = false;
+    document.getElementById('submitLabel').textContent = 'Process Claim';
+    resetPipeline();
+    return;
+  }
+
+  // Animate steps with staggered reveals
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+
+  // Step 1 — PII
+  await delay(350);
+  if (result.pii_masked) {
+    const tags = result.pii_types_found.map(t => `<span class="pii-tag">${t}</span>`).join('');
+    setStepResult('pii', 'sb-warn', `${result.pii_types_found.length} Masked`, tags, 'warn');
+  } else {
+    setStepResult('pii', 'sb-success', 'Clean', 'No PII detected in claim text', 'success');
+  }
+  setStepActive('classify');
+
+  // Step 2 — Classification
+  await delay(380);
+  const isComplex = result.task_type === 'complex';
+  setStepResult(
+    'classify',
+    isComplex ? 'sb-red' : 'sb-success',
+    result.task_type.toUpperCase(),
+    `~${result.estimated_tokens} tokens &mdash; ${result.task_reason}`,
+    isComplex ? '' : 'success'
+  );
+  setStepActive('cache');
+
+  // Step 3 — Cache
+  await delay(360);
+  if (result.cache_hit) {
+    setStepResult('cache', 'sb-hit', '✓ HIT', 'Served from cache — $0 cost, 0 tokens', 'success');
+  } else {
+    setStepResult('cache', 'sb-miss', 'MISS', 'Not cached — making LLM call', '');
+  }
+  setStepActive('route');
+
+  // Step 4 — Routing
+  await delay(380);
+  const fallbackNote = result.fallback_used
+    ? ` &mdash; <span style="color:var(--red)">⚠ primary unavailable, using fallback</span>`
+    : '';
+  setStepResult(
+    'route', 'sb-info', result.model_used,
+    `Provider: ${result.provider}${fallbackNote}`,
+    'success'
+  );
+  setStepActive('llm');
+
+  // Step 5 — LLM
+  await delay(400);
+  const tokenStr = result.cache_hit ? '0 / 0 (cached)' : `${result.tokens_in} in / ${result.tokens_out} out`;
+  setStepResult(
+    'llm', 'sb-success', result.cache_hit ? 'CACHED' : 'Done',
+    `${tokenStr} &mdash; $${result.cost_usd.toFixed(6)}`,
+    'success'
+  );
+
+  // Summary
+  await delay(300);
+  document.getElementById('summaryText').textContent = result.summary;
+  document.getElementById('summaryCard').classList.add('visible');
+
+  // Masked input preview
+  if (result.pii_masked) {
+    document.getElementById('maskedText').textContent = result.masked_input_preview;
+    document.getElementById('maskedPreview').classList.add('visible');
+  }
+
+  // Metrics
+  await delay(150);
+  const modelShort = result.model_used.replace('groq/', '');
+  document.getElementById('mModel').textContent    = modelShort;
+  document.getElementById('mProvider').textContent = result.provider;
+  document.getElementById('mTokens').textContent   = result.cache_hit ? '0 / 0' : `${result.tokens_in} / ${result.tokens_out}`;
+  document.getElementById('mCost').textContent     = `$${result.cost_usd.toFixed(6)}`;
+  document.getElementById('mCost').className       = `metric-value ${result.cache_hit ? 'green' : ''}`;
+
+  document.getElementById('mLatency').textContent  = `${result.latency_ms} ms`;
+  const cacheEl = document.getElementById('mCache');
+  cacheEl.textContent = result.cache_hit ? '✓ HIT' : 'MISS';
+  cacheEl.className   = `metric-value ${result.cache_hit ? 'green' : 'yellow'}`;
+  const fbEl = document.getElementById('mFallback');
+  fbEl.textContent = result.fallback_used ? '⚠ YES' : 'No';
+  fbEl.className   = `metric-value ${result.fallback_used ? 'red' : ''}`;
+  const piiEl = document.getElementById('mPii');
+  piiEl.textContent = result.pii_masked ? `🔒 ${result.pii_types_found.join(', ')}` : 'No';
+  piiEl.className   = `metric-value ${result.pii_masked ? 'yellow' : ''}`;
+
+  document.getElementById('metricsBar1').classList.add('visible');
+  document.getElementById('metricsBar2').classList.add('visible');
+
+  // Explainability panel
+  if (result.explainability) renderExplainability(result.explainability);
+
+  // Refresh dashboard
+  loadDashboard();
+
+  btn.disabled = false;
+  document.getElementById('submitLabel').textContent = 'Process Claim';
+}
+
+// ── Sample claim loader ───────────────────────────────────────────────────────
+function loadSample(key) {
+  document.getElementById('claimText').value = SAMPLES[key];
+  if (key === 'complex') document.getElementById('team').value = 'claims-health';
+  if (key === 'fraud')   document.getElementById('team').value = 'fraud-detection';
+  if (key === 'simple')  document.getElementById('team').value = 'claims-auto';
+}
+
+// ── Dashboard data ────────────────────────────────────────────────────────────
+const CHART_COLORS = [
+  '#58a6ff','#3fb950','#d29922','#f85149','#bc8cff','#39d353','#06b6d4','#fb923c'
+];
+
+async function loadDashboard() {
+  try {
+    const [stats, teams, models, recent] = await Promise.all([
+      fetch('/api/stats').then(r => r.json()),
+      fetch('/api/teams').then(r => r.json()),
+      fetch('/api/models').then(r => r.json()),
+      fetch('/api/recent').then(r => r.json()),
+    ]);
+
+    // Header stats
+    document.getElementById('hdrRequests').textContent = stats.total_requests;
+    document.getElementById('hdrCost').textContent     = `$${(stats.total_cost_usd||0).toFixed(5)}`;
+    document.getElementById('hdrCache').textContent    = `${stats.cache_hit_rate}% hit`;
+
+    // KPI cards
+    document.getElementById('kRequests').textContent  = stats.total_requests;
+    document.getElementById('kCost').textContent      = `$${(stats.total_cost_usd||0).toFixed(5)}`;
+    document.getElementById('kLatency').textContent   = `${stats.avg_latency_ms||0} ms`;
+    document.getElementById('kCache').textContent     = `${stats.cache_hit_rate}%`;
+    document.getElementById('kPii').textContent       = stats.pii_masked_count;
+    document.getElementById('kFallbacks').textContent = stats.fallback_count;
+
+    // Team budget chart
+    renderTeamChart(teams);
+
+    // Model usage chart
+    renderModelChart(models);
+
+    // Cache chart
+    const hits   = stats.cache_hits || 0;
+    const misses = (stats.total_requests || 0) - hits;
+    renderCacheChart(hits, misses);
+
+    // Recent requests table
+    renderTable(recent);
+
+  } catch (e) { console.warn('Dashboard load error:', e); }
+}
+
+function renderTeamChart(teams) {
+  const ctx = document.getElementById('chartTeams').getContext('2d');
+  if (charts.teams) charts.teams.destroy();
+  charts.teams = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: teams.map(t => t.team),
+      datasets: [{
+        label: 'Cost (USD)',
+        data: teams.map(t => t.total_cost || 0),
+        backgroundColor: CHART_COLORS.slice(0, teams.length).map(c => c + 'bb'),
+        borderColor: CHART_COLORS.slice(0, teams.length),
+        borderWidth: 1,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#30363d44' }, ticks: { color: '#8b949e', font: { size: 11 } } },
+        y: { grid: { display: false },     ticks: { color: '#e6edf3', font: { size: 12, weight: '600' } } },
+      },
+    }
+  });
+}
+
+function renderModelChart(models) {
+  const ctx = document.getElementById('chartModels').getContext('2d');
+  if (charts.models) charts.models.destroy();
+  charts.models = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: models.map(m => m.model.replace('groq/', '')),
+      datasets: [{
+        data: models.map(m => m.requests),
+        backgroundColor: CHART_COLORS.slice(0, models.length).map(c => c + 'cc'),
+        borderColor: '#161b22',
+        borderWidth: 2,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#8b949e', font: { size: 11 }, padding: 10, boxWidth: 12 } }
+      },
+    }
+  });
+}
+
+function renderCacheChart(hits, misses) {
+  const ctx = document.getElementById('chartCache').getContext('2d');
+  if (charts.cache) charts.cache.destroy();
+  const rate = hits + misses > 0 ? ((hits / (hits + misses)) * 100).toFixed(1) : 0;
+  charts.cache = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Cache Hit', 'Cache Miss'],
+      datasets: [{
+        data: [hits, misses],
+        backgroundColor: ['#3fb950cc', '#f8514966'],
+        borderColor: '#161b22',
+        borderWidth: 2,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#8b949e', font: { size: 11 }, padding: 10, boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}` } }
+      },
+    },
+    plugins: [{
+      id: 'centerText',
+      beforeDraw(chart) {
+        const { ctx, chartArea: { width, height, left, top } } = chart;
+        ctx.save();
+        ctx.font = 'bold 20px -apple-system, sans-serif';
+        ctx.fillStyle = '#3fb950';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${rate}%`, left + width / 2, top + height / 2 - 8);
+        ctx.font = '11px -apple-system, sans-serif';
+        ctx.fillStyle = '#8b949e';
+        ctx.fillText('hit rate', left + width / 2, top + height / 2 + 14);
+        ctx.restore();
+      }
+    }]
+  });
+}
+
+function renderTable(rows) {
+  const tbody = document.getElementById('recentBody');
+  if (!rows.length) { tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;color:var(--txt-3);padding:24px">No recent requests.</td></tr>'; return; }
+
+  tbody.innerHTML = rows.map(r => {
+    const taskBadge = r.task_type === 'complex'
+      ? '<span class="ib ib-complex">COMPLEX</span>'
+      : '<span class="ib ib-simple">SIMPLE</span>';
+    const cacheBadge = r.cache_hit
+      ? '<span class="ib ib-hit">HIT</span>'
+      : '<span class="ib ib-miss">MISS</span>';
+    const fbBadge = r.fallback_used
+      ? '<span class="ib ib-yes">YES</span>'
+      : '<span class="ib ib-no">no</span>';
+    const piiBadge = r.pii_masked
+      ? '<span class="ib ib-pii">🔒 YES</span>'
+      : '<span class="ib ib-no">no</span>';
+    const modelShort = (r.model_used||'').replace('groq/', '');
+    const time = (r.timestamp||'').slice(11, 19);
+    return `
+      <tr>
+        <td class="td-id">${r.request_id}</td>
+        <td class="td-mono">${time}</td>
+        <td>${r.team}</td>
+        <td class="td-mono">${r.user_id}</td>
+        <td>${taskBadge}</td>
+        <td><span class="ib ib-model">${modelShort}</span></td>
+        <td class="td-mono">${r.provider}</td>
+        <td class="td-mono">${r.tokens_in} / ${r.tokens_out}</td>
+        <td class="td-mono">$${(r.cost_usd||0).toFixed(6)}</td>
+        <td class="td-mono">${r.latency_ms} ms</td>
+        <td>${cacheBadge}</td>
+        <td>${fbBadge}</td>
+        <td>${piiBadge}</td>
+      </tr>`;
+  }).join('');
+}
+
+async function clearRecentRequests() {
+  const btn = document.getElementById('clearRecentBtn');
+  if (!confirm('Clear all Recent Requests history from the dashboard?')) return;
+
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/recent', { method: 'DELETE' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || res.statusText || 'Failed to clear recent requests');
+    }
+
+    resetPipeline();
+    clearOldRequest();
+    await loadDashboard();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Mode detection ────────────────────────────────────────────────────────────
+async function detectMode() {
+  try {
+    const { mock_mode } = await fetch('/api/mode').then(r => r.json());
+    const el = document.getElementById('modeBadge');
+    if (!mock_mode) {
+      el.textContent = 'LIVE MODE';
+      el.className   = 'badge badge-live';
+    }
+  } catch {}
+}
+
+// ── Explainability panel ──────────────────────────────────────────────────────
+function toggleXP() {
+  const body    = document.getElementById('xpBody');
+  const chevron = document.getElementById('xpChevron');
+  const visible = body.style.display !== 'none';
+  body.style.display    = visible ? 'none' : 'flex';
+  chevron.className     = visible ? 'xp-chevron' : 'xp-chevron open';
+}
+
+function renderExplainability(xp) {
+  if (!xp) return;
+  const card = document.getElementById('xpCard');
+  const body = document.getElementById('xpBody');
+  body.style.display    = 'flex';   // start open
+  document.getElementById('xpChevron').className = 'xp-chevron open';
+
+  const { classification: clf, routing: rt, pii, cache } = xp;
+
+  // ── 1. Classification ────────────────────────────────────────────────────
+  const confColor = clf.confidence_pct >= 80 ? '#3fb950' : clf.confidence_pct >= 60 ? '#d29922' : '#f85149';
+  const complexTags = clf.complex_signals.length
+    ? clf.complex_signals.map(s => `<span class="sig-tag sig-complex">${s}</span>`).join('')
+    : '<span class="sig-tag sig-none">none</span>';
+  const simpleTags  = clf.simple_signals.length
+    ? clf.simple_signals.map(s => `<span class="sig-tag sig-simple">${s}</span>`).join('')
+    : '<span class="sig-tag sig-none">none</span>';
+
+  const taskColor = clf.decision === 'COMPLEX' ? 'red' : 'green';
+
+  // ── 2. Cost comparison table ──────────────────────────────────────────────
+  const costRows = rt.cost_comparison.map(c => {
+    const tierPill = `<span class="tier-pill tier-${c.tier}">${c.tier}</span>`;
+    const marker   = c.selected ? '<span class="selected-marker">▶ SELECTED</span>' : '';
+    const whyNot   = !c.selected ? `<span style="color:var(--txt-3);font-size:.68rem">${c.why_not||''}</span>` : '';
+    return `<tr class="${c.selected ? 'selected-row' : ''}">
+      <td>${marker} ${c.model.replace('azure/','')}</td>
+      <td>${tierPill}</td>
+      <td style="font-family:monospace">$${c.est_cost_usd.toFixed(7)}</td>
+      <td style="color:var(--txt-2);font-size:.7rem">${c.capability}</td>
+      <td>${whyNot}</td>
+    </tr>`;
+  }).join('');
+
+  // Savings callout
+  const savingHtml = rt.savings_vs_premium > 0
+    ? `<div class="xp-callout green">
+         💰 Saved <b>$${rt.savings_vs_premium.toFixed(7)}</b> vs using the premium model on this request.
+       </div>`
+    : `<div class="xp-callout">
+         Premium model selected — additional cost is justified by claim complexity and financial exposure.
+       </div>`;
+
+  // Fallback callout
+  const fallbackHtml = rt.fallback_story
+    ? `<div class="xp-callout red">⚠ Fallback triggered: ${rt.fallback_story}</div>`
+    : '';
+
+  // ── 3. PII callout color ──────────────────────────────────────────────────
+  const piiCalloutClass = pii.action === 'MASKED' ? 'yellow' : 'green';
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  body.innerHTML = `
+
+    <!-- Classification -->
+    <div class="xp-section">
+      <div class="xp-section-header">
+        <span class="xp-section-icon">🔍</span>
+        <span class="xp-section-title">Task Classification</span>
+        <span class="xp-section-badge">
+          <span class="ib ${clf.decision==='COMPLEX'?'ib-complex':'ib-simple'}">${clf.decision}</span>
+        </span>
+      </div>
+      <div class="xp-section-body">
+
+        <div class="xp-row">
+          <span class="xp-key">Confidence</span>
+          <div class="conf-row" style="flex:1">
+            <div class="conf-bar-bg">
+              <div class="conf-bar-fill" style="width:${clf.confidence_pct}%;background:${confColor}"></div>
+            </div>
+            <span class="conf-pct" style="color:${confColor}">${clf.confidence_pct}%</span>
+          </div>
+        </div>
+
+        <div class="xp-row">
+          <span class="xp-key">Rule triggered</span>
+          <span class="xp-val mono">${clf.rule_triggered}</span>
+        </div>
+
+        <div class="xp-row">
+          <span class="xp-key">Token count</span>
+          <span class="xp-val hl">${clf.token_count}</span>
+          <span class="xp-val" style="color:var(--txt-3)"> / threshold ${clf.token_threshold}</span>
+        </div>
+
+        <div class="xp-row" style="align-items:flex-start">
+          <span class="xp-key">Complex signals</span>
+          <div class="signal-list">${complexTags}</div>
+        </div>
+
+        <div class="xp-row" style="align-items:flex-start">
+          <span class="xp-key">Simple signals</span>
+          <div class="signal-list">${simpleTags}</div>
+        </div>
+
+        <div class="xp-callout ${taskColor==='red'?'red':'green'}" style="margin-top:4px">
+          ${clf.plain_english}
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Routing -->
+    <div class="xp-section">
+      <div class="xp-section-header">
+        <span class="xp-section-icon">🗺️</span>
+        <span class="xp-section-title">Model Routing Decision</span>
+        <span class="xp-section-badge">
+          <span class="ib ib-model">${rt.model_selected.replace('azure/','')}</span>
+        </span>
+      </div>
+      <div class="xp-section-body">
+
+        <div class="xp-row">
+          <span class="xp-key">Routing rule</span>
+          <span class="xp-val mono">${rt.routing_rule}</span>
+        </div>
+
+        <div class="xp-row">
+          <span class="xp-key">Why selected</span>
+          <span class="xp-val">${rt.selection_reason}</span>
+        </div>
+
+        <div class="xp-row">
+          <span class="xp-key">Model strength</span>
+          <span class="xp-val">${rt.model_capability}</span>
+        </div>
+
+        <div style="margin-top:6px">
+          <div style="font-size:.68rem;font-weight:700;color:var(--txt-3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px">
+            Cost comparison — all candidate models
+          </div>
+          <table class="cost-table">
+            <thead>
+              <tr>
+                <th>Model</th><th>Tier</th><th>Est. Cost (USD)</th>
+                <th>Capability</th><th>Why not?</th>
+              </tr>
+            </thead>
+            <tbody>${costRows}</tbody>
+          </table>
+        </div>
+
+        ${savingHtml}
+        ${fallbackHtml}
+      </div>
+    </div>
+
+    <!-- PII & Cache -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+      <div class="xp-section">
+        <div class="xp-section-header">
+          <span class="xp-section-icon">🔒</span>
+          <span class="xp-section-title">PII Action</span>
+          <span class="xp-section-badge">
+            <span class="ib ${pii.action==='MASKED'?'ib-pii':'ib-no'}">${pii.action}</span>
+          </span>
+        </div>
+        <div class="xp-section-body">
+          <div class="xp-row">
+            <span class="xp-key">Types found</span>
+            <span class="xp-val ${pii.count>0?'yellow':'green'}">${pii.count > 0 ? pii.types_found.join(', ') : 'None'}</span>
+          </div>
+          <div class="xp-row">
+            <span class="xp-key">Compliance</span>
+            <span class="xp-val" style="font-size:.72rem">${pii.compliance}</span>
+          </div>
+          <div class="xp-callout ${piiCalloutClass}" style="margin-top:4px;font-size:.73rem">
+            ${pii.plain_english}
+          </div>
+        </div>
+      </div>
+
+      <div class="xp-section">
+        <div class="xp-section-header">
+          <span class="xp-section-icon">⚡</span>
+          <span class="xp-section-title">Cache Decision</span>
+          <span class="xp-section-badge">
+            <span class="ib ${cache.action==='HIT'?'ib-hit':'ib-miss'}">${cache.action}</span>
+          </span>
+        </div>
+        <div class="xp-section-body">
+          <div class="xp-row">
+            <span class="xp-key">Cost saved</span>
+            <span class="xp-val green">${cache.cost_saved}</span>
+          </div>
+          <div class="xp-callout ${cache.action==='HIT'?'green':''}" style="margin-top:4px;font-size:.73rem">
+            ${cache.plain_english}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  card.classList.add('visible');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+buildPipeline();
+loadSample('simple');
+detectMode();
+loadDashboard();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+fastapi>=0.110.0
+uvicorn>=0.29.0
+streamlit>=1.35.0
+plotly>=5.20.0
+pandas>=2.0.0
+python-dotenv>=1.0.0
+rich>=13.0.0
+
+# Optional — only needed for LIVE LLM calls (requires Windows Long Path enabled).
+# Mock mode works without it. To enable: pip install "litellm>=1.0,<1.25"
+# litellm>=1.0,<1.25
